@@ -55,7 +55,7 @@ RPC 调用链文字描述：
 ####2、处理报文
 对上述报文进行编解码操作。
 
-```code
+```javascript
 const buf = Buffer.alloc(1024 * 1024); // 分配一块 1M 的内存
 let offset = 0;
 
@@ -72,7 +72,7 @@ const payload = {
   args: [1, 2]
 };
 const bodyLength = buf.write(JSON.stringify(payload), offset);
-buf.writeInt32BE(bodyLength, 6);//第二个参数是offset
+buf.writeInt32BE(bodyLength, 6); //第二个参数是offset
 offset += bodyLength;
 buf.slice(0, offset);
 
@@ -87,43 +87,36 @@ const deBody = buf.slice(10, 10 + deBodyLength);
 const dePayload = JSON.parse(deBody);
 
 console.log(dePayload);
-
 ```
 
 ####3、传输报文
 由于网络数据并不是按照我们定义的协议包为单位传输的，有可能一次收到多个包，或者一个包分多次收到。那么收到数据后第一件事情应该是将它切分成一个一个完整的包。
 
-```code
-const net = require('net');
-const socket = net.connect(12200, '127.0.0.1');
+```javascript
+const net = require("net");
+const socket = net.connect(12200, "127.0.0.1");
 const HEADER_LEN = 10; // 头部长度
+let header;
 
-let buf;
-
-socket.on('data', data => {
-  if (!buf) {
-    buf = data;
-  } else {
-    buf = Buffer.concat([ buf, data ]);
+socket.on("readable", () => {
+  if (!header) {
+    header = socket.read(HEADER_LEN);
   }
-
-  while (buf.length > HEADER_LEN) {
-    const packetLength = HEADER_LEN + buf.readInt32BE(6);
-    if (buf.length > packetLength) {
-      // 切分出完整的 packet
-      const packet = buf.slice(0, packetLength));
-      // 处理 packet 逻辑
-      // ...
-
-      buf = buf.slice(packetLength);
-    } else {
-      break;
-    }
+  if (!header) {
+    return;
   }
+  const bodyLength = header.readInt32BE(6);
+  const body = socket.read(bodyLength);
+  if (!body) {
+    return;
+  }
+  const packet = Buffer.concat([header, body], HEADER_LEN + bodyLength);
+  // packet 的处理逻辑
+  // ...
 });
 ```
 
-后续优化空间，改成流方式进行处理
+待续。。。
 
 参考：
 https://www.yuque.com/egg/nodejs/dklip5
